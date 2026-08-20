@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: siemens
+      defaultBucket: factory
+      tlsSkipVerify: true
+    secureJsonData:
+      token: siemens-insights-token
+    isDefault: true
+    editable: true

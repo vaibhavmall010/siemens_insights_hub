@@ -1,0 +1,100 @@
+version: "3.9"
+
+services:
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: siemens_influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE:        setup
+      DOCKER_INFLUXDB_INIT_USERNAME:    admin
+      DOCKER_INFLUXDB_INIT_PASSWORD:    siemens-admin-pass
+      DOCKER_INFLUXDB_INIT_ORG:         siemens
+      DOCKER_INFLUXDB_INIT_BUCKET:      factory
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: siemens-insights-token
+      DOCKER_INFLUXDB_INIT_RETENTION:   30d
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  simulator:
+    build:
+      context: .
+      dockerfile: generator/Dockerfile
+    container_name: siemens_simulator
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    environment:
+      INFLUXDB_URL:    http://influxdb:8086
+      INFLUXDB_TOKEN:  siemens-insights-token
+      INFLUXDB_ORG:    siemens
+      INFLUXDB_BUCKET: factory
+      EMIT_INTERVAL:   "0.5"
+      ANOMALY_RATE:    "0.04"
+
+  anomaly_detector:
+    build:
+      context: .
+      dockerfile: anomaly/Dockerfile
+    container_name: siemens_anomaly
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    environment:
+      INFLUXDB_URL:    http://influxdb:8086
+      INFLUXDB_TOKEN:  siemens-insights-token
+      INFLUXDB_ORG:    siemens
+      INFLUXDB_BUCKET: factory
+      POLL_INTERVAL:   "30"
+      CONTAMINATION:   "0.04"
+
+  alert_webhook:
+    build:
+      context: .
+      dockerfile: webhook/Dockerfile
+    container_name: siemens_webhook
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    volumes:
+      - webhook_data:/data
+    environment:
+      DB_PATH: /data/alerts.db
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: siemens_grafana
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+      - anomaly_detector
+      - alert_webhook
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER:     admin
+      GF_SECURITY_ADMIN_PASSWORD: siemens-grafana
+      GF_USERS_ALLOW_SIGN_UP:     "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: >
+        /etc/grafana/provisioning/dashboards/factory_dashboard.json
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-worldmap-panel
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  influxdb_data:
+  grafana_data:
+  webhook_data:

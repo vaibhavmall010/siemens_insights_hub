@@ -1,0 +1,343 @@
+{
+  "title": "Siemens Insights Hub — Factory Observability",
+  "uid": "siemens-insights-hub",
+  "version": 1,
+  "schemaVersion": 38,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "tags": ["siemens", "factory", "iot", "mlops"],
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Fleet machines online",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",   "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"factory_sensors\" and r._field == \"power_kw\")\n  |> distinct(column: \"machine_id\")\n  |> count()"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Active anomalies",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange","value": 1 },
+              { "color": "red",   "value": 3 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: -2m)\n  |> filter(fn: (r) => r._measurement == \"anomaly_scores\" and r._field == \"is_anomaly\")\n  |> filter(fn: (r) => r._value == 1)\n  |> distinct(column: \"machine_id\")\n  |> count()"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Avg power consumption (kW)",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["mean"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatt",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "orange", "value": 20 },
+              { "color": "red",    "value": 30 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"factory_sensors\" and r._field == \"power_kw\")\n  |> mean()"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "Alerts received (24h)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "orange", "value": 5 },
+              { "color": "red",    "value": 10 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"anomaly_scores\" and r._field == \"is_anomaly\" and r._value == 1)\n  |> count()"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "OEE estimate (%)",
+      "type": "gauge",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "minVizValue": 0,
+        "maxVizValue": 100,
+        "showThresholdLabels": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",    "value": null },
+              { "color": "orange", "value": 65 },
+              { "color": "green",  "value": 85 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"anomaly_scores\" and r._field == \"is_anomaly\")\n  |> mean()\n  |> map(fn: (r) => ({ r with _value: (1.0 - r._value) * 95.0 }))"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "Detector service status",
+      "type": "stat",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",   "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: -2m)\n  |> filter(fn: (r) => r._measurement == \"anomaly_scores\")\n  |> count()\n  |> map(fn: (r) => ({ r with _value: if r._value > 0 then 1 else 0 }))"
+      }]
+    },
+    {
+      "id": 10,
+      "title": "Vibration — all machines (mm/s)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": { "lineWidth": 1.5 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "orange", "value": 3.0 },
+              { "color": "red",    "value": 5.0 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"factory_sensors\" and r._field == \"vibration_mm_s\")\n  |> aggregateWindow(every: 10s, fn: mean, createEmpty: false)\n  |> yield(name: \"vibration\")"
+      }]
+    },
+    {
+      "id": 11,
+      "title": "Temperature — all machines (C)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": { "lineWidth": 1.5 }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"factory_sensors\" and r._field == \"temperature_c\")\n  |> aggregateWindow(every: 10s, fn: mean, createEmpty: false)\n  |> yield(name: \"temperature\")"
+      }]
+    },
+    {
+      "id": 12,
+      "title": "Anomaly score per machine (0=normal, 1=anomaly)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 7 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "none",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "orange", "value": 0.5 },
+              { "color": "red",    "value": 0.8 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"anomaly_scores\" and r._field == \"anomaly_score\")\n  |> aggregateWindow(every: 30s, fn: last, createEmpty: false)\n  |> yield(name: \"anomaly_score\")"
+      }]
+    },
+    {
+      "id": 13,
+      "title": "Motor current — all machines (A)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 7 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "amp",
+          "custom": { "lineWidth": 1.5 }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"factory_sensors\" and r._field == \"current_a\")\n  |> aggregateWindow(every: 10s, fn: mean, createEmpty: false)\n  |> yield(name: \"current\")"
+      }]
+    },
+    {
+      "id": 14,
+      "title": "Power consumption per machine (kW)",
+      "type": "barchart",
+      "gridPos": { "x": 0, "y": 19, "w": 8, "h": 7 },
+      "options": {
+        "orientation": "vertical",
+        "groupWidth": 0.6,
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "kwatt" }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"factory_sensors\" and r._field == \"power_kw\")\n  |> group(columns: [\"machine_id\"])\n  |> mean()\n  |> yield(name: \"power_mean\")"
+      }]
+    },
+    {
+      "id": 15,
+      "title": "Pressure — all machines (bar)",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 19, "w": 8, "h": 7 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "pressurebar", "custom": { "lineWidth": 1.5 } }
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"factory_sensors\" and r._field == \"pressure_bar\")\n  |> aggregateWindow(every: 10s, fn: mean, createEmpty: false)\n  |> yield(name: \"pressure\")"
+      }]
+    },
+    {
+      "id": 16,
+      "title": "Anomaly events log",
+      "type": "table",
+      "gridPos": { "x": 16, "y": 19, "w": 8, "h": 7 },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Time", "desc": true }]
+      },
+      "targets": [{
+        "datasource": { "type": "influxdb" },
+        "refId": "A",
+        "query": "from(bucket: \"factory\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"factory_sensors\" and r._field == \"is_anomaly\" and r._value == 1)\n  |> keep(columns: [\"_time\", \"machine_id\", \"fault_type\", \"hall\"])\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 50)"
+      }]
+    }
+  ]
+}
